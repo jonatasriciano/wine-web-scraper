@@ -3,29 +3,42 @@
 Wine Data Collection API
 ========================
 
-This project is designed to collect information about wines available in Canada. We will create different "robots" (called web scrapers) to gather wine details from multiple websites. These details will then be made available through an easy-to-use API that other systems can access.
+This project is designed to automatically gather information about wines available in Canada. We will build a system that collects data from various wine websites and presents it in a way that other software can access it easily through an API (a system interface).
+
+To do this, we will create "robots" or "scrapers" that can visit wine websites, gather information about the wines, and send this data to a centralized system. Think of it like having a digital assistant that goes to various online stores, picks up the wine details, and organizes everything for you.
 
 1\. Project Overview
 --------------------
 
-The goal of this project is to build a system that automatically collects data about wines from various online stores in Canada. The collected data will be made accessible through a web API (a type of digital interface). The system will use two key techniques:
+We are building a system that can:
 
-*   **Web Scraping**: This involves extracting information from websites.
-*   **RPA (Robotic Process Automation)**: Automating tasks, like navigating websites, to gather data.
+*   Collect information about wines from multiple websites.
+*   Store that information temporarily or in a database.
+*   Provide the collected information to other systems through a web API.
 
-Each wine store will have its own robot that knows how to gather information from its website. The data will be made available in a structured way using an API.
+The system will use two key technologies:
 
-2\. Structure of the Project
-----------------------------
+*   **Web Scraping**: This is the process of extracting information from websites. It's like sending a robot to a store's website to read the details of each wine available there.
+*   **RPA (Robotic Process Automation)**: This allows the robot to automate tasks such as navigating websites, selecting information, and then storing or using that data.
 
-Here’s how the project will be organized:
+The project consists of two main components:
 
-*   **Scrapers (Robots)**: These are scripts that know how to get data from each website.
-*   **API**: The system that will allow us to share the collected data with other applications.
-*   **Database**: Temporary storage for the data (optional). It may not be necessary if we pull data in real-time.
-*   **Docker**: A tool that helps make sure the system works in the same way on different computers.
+*   **Web Scrapers (Robots)**: Each website will have a unique scraper that understands how to extract wine data from it.
+*   **API (Application Programming Interface)**: This is like a waiter at a restaurant. When you request wine data, the API goes to the kitchen (the scrapers and database), gets the data, and brings it back to you in a clean format.
+
+2\. Project Structure
+---------------------
+
+We will organize the project as follows:
+
+*   **Scrapers (Robots)**: These are scripts that fetch data from each website.
+*   **API**: The API will provide the collected data. Other software can make requests to the API to get the wine data.
+*   **Docker**: This is a tool to package everything together and ensure the system runs consistently on any computer.
+*   **Database (Optional)**: We may use a database to temporarily store the wine data before sending it through the API.
 
 ### Folder Structure
+
+The project will be organized into different folders and files:
 
             /project
             ├── bots/                     # Scrapers for each website
@@ -38,147 +51,129 @@ Here’s how the project will be organized:
             └── Dockerfile                # Instructions to create the system container
         
 
-3\. Web Scraping (Data Collection)
-----------------------------------
+This structure helps to keep everything organized and ensures each part of the system works together smoothly.
+
+3\. Web Scraping (How Data is Collected)
+----------------------------------------
 
 ### What is Web Scraping?
 
-Web scraping is the process of automatically extracting information from websites. In this project, we will use web scraping to collect data about wines, like their price, rating, and region, from different online wine stores.
+Web scraping is like sending a robot to a website to automatically gather information. For example, a wine website might list the name, price, region, and type of wine. The robot will visit the site, read these details, and collect them for later use.
 
-### Choosing the Right Tools
+### Tools We Use for Scraping
 
-For scraping the websites, we will use two main tools:
+To gather data, we will use two main tools:
 
-*   **BeautifulSoup**: A tool to extract data from simple websites (static websites) that don’t use a lot of JavaScript.
-*   **Selenium**: A tool for websites that require JavaScript to display content (dynamic websites).
+*   **BeautifulSoup**: This tool helps extract data from simpler websites that don’t have complex features like dynamic content (JavaScript). It is ideal for static websites that show the wine data directly in the HTML code of the page.
+*   **Selenium**: This tool is used for more complex websites where the content is generated by JavaScript. Selenium can interact with websites just like a human does — clicking buttons, scrolling, and waiting for content to appear.
 
-### Scraping Example (Static Website with BeautifulSoup)
+### Scraping a Simple Website with BeautifulSoup
 
-Here’s how a scraper for a simple website works:
+Let’s look at how a scraper for a simple website works using BeautifulSoup:
 
             import requests
             from bs4 import BeautifulSoup
-            import json
 
-            # Load configuration for Site A
-            with open('config/site\_a\_config.json') as config\_file:
-                config = json.load(config\_file)
+            # Fetch data from the website
+            response = requests.get('https://www.example-wine-site.com')
+            
+            if response.status\_code == 200:
+                soup = BeautifulSoup(response.content, 'html.parser')
 
-            def scrape\_site\_a():
-                # Request data from the website
-                response = requests.get(config\['base\_url'\], headers=config\['headers'\])
-                
-                # If the website responds correctly
-                if response.status\_code == 200:
-                    soup = BeautifulSoup(response.content, 'lxml')
-                    
-                    # Collect wine details
-                    wines = \[\]
-                    for wine\_item in soup.select('.product-item'):
-                        wine\_data = {
-                            "name": wine\_item.select\_one(config\['selectors'\]\['name'\]).text.strip(),
-                            "price": wine\_item.select\_one(config\['selectors'\]\['price'\]).text.strip(),
-                            "rating": wine\_item.select\_one(config\['selectors'\]\['rating'\]).text.strip(),
-                            "region": wine\_item.select\_one(config\['selectors'\]\['region'\]).text.strip(),
-                            "type": wine\_item.select\_one(config\['selectors'\]\['type'\]).text.strip(),
-                            "url": config\['base\_url'\] + wine\_item.a\['href'\]
-                        }
-                        wines.append(wine\_data)
+                # Extract wine details
+                wines = \[\]
+                for wine\_item in soup.find\_all('div', class\_='wine-item'):
+                    wine\_data = {
+                        'name': wine\_item.find('h2').text.strip(),
+                        'price': wine\_item.find('span', class\_='price').text.strip(),
+                        'region': wine\_item.find('span', class\_='region').text.strip(),
+                    }
+                    wines.append(wine\_data)
 
-                    return wines
+                print(wines)
         
 
-In this example, we request data from the website and use the BeautifulSoup tool to extract details like the name, price, rating, region, and type of wine. We store these details and return them as a list.
+In this code, we request the website’s content, then use BeautifulSoup to find the details of each wine, like its name, price, and region. We store this information in a list and print it out.
 
-### Scraping Dynamic Websites with Selenium
+### Scraping a Dynamic Website with Selenium
 
-If the website uses JavaScript to display the wine information, we will use Selenium, which can interact with the website just like a human user:
+For websites that use JavaScript to show wine data, we use Selenium. Here’s an example:
 
             from selenium import webdriver
             from selenium.webdriver.common.by import By
             import time
 
-            options = webdriver.ChromeOptions()
-            options.add\_argument('--headless')  # Run without opening a browser window
-            driver = webdriver.Chrome(options=options)
+            # Set up Selenium to use Chrome
+            driver = webdriver.Chrome()
 
-            # Access the site
-            driver.get('https://www.dynamic-website.com/wines')
+            # Open the website
+            driver.get('https://www.dynamic-wine-site.com')
 
             # Wait for the page to load
             time.sleep(5)
 
-            # Collect wine data
+            # Extract wine details
             wines = \[\]
-            wine\_items = driver.find\_elements(By.CLASS\_NAME, 'product-item')
-            for item in wine\_items:
-                name = item.find\_element(By.CLASS\_NAME, 'product-title').text
-                price = item.find\_element(By.CLASS\_NAME, 'price-tag').text
-                wines.append({"name": name, "price": price})
+            wine\_elements = driver.find\_elements(By.CLASS\_NAME, 'wine-item')
+            for element in wine\_elements:
+                name = element.find\_element(By.CLASS\_NAME, 'wine-name').text
+                price = element.find\_element(By.CLASS\_NAME, 'wine-price').text
+                wines.append({'name': name, 'price': price})
 
-            driver.quit()  # Close the browser
+            # Close the browser
+            driver.quit()
+
+            print(wines)
         
 
-In this example, Selenium interacts with the website, waits for content to load, and then extracts the wine details.
+In this case, Selenium is used to open the website and wait for the content to load. Then it extracts the wine name and price, just like before, but this time it can handle the dynamic content generated by JavaScript.
 
-4\. The API (How We Share Data)
--------------------------------
+4\. The API (How Data is Provided to Others)
+--------------------------------------------
 
 ### What is an API?
 
-An API (Application Programming Interface) is like a waiter in a restaurant. It takes your request (for wine data), goes to the kitchen (where the data is stored), and brings the result back to you in a clean format. In our project, the API will allow other systems to access the wine data we collect.
+Think of an API as a bridge that allows different software systems to talk to each other. It’s like ordering food in a restaurant. You (the software) tell the waiter (the API) what you want (wine data), and the waiter brings it to you from the kitchen (the scraper and the database).
 
 ### How the API Works
 
-We will create an API that can provide the wine data we collected. It will have several simple commands (called endpoints) to get wine data:
+The API allows other systems to make requests for wine data. Here are the main actions it will handle:
 
-*   **GET /wines**: Returns all collected wines.
-*   **POST /scrape/{site\_id}**: Starts collecting data from a specific site.
-*   **GET /health**: Checks if the system is working properly.
+*   **GET /wines**: This request gets all the wine data that has been collected so far.
+*   **POST /scrape/{site\_id}**: This request tells the system to start gathering data from a specific wine website.
+*   **GET /health**: This checks whether the system is running properly.
 
-### API Example Code
+### API Example
+
+This is how the API is built in Python using the Flask library. It listens for requests and returns data when asked:
 
             from flask import Flask, jsonify
             from bots.site\_a\_scraper import scrape\_site\_a
 
             app = Flask(\_\_name\_\_)
 
-            # List all wines collected
+            # Route to list all wines
             @app.route('/wines', methods=\['GET'\])
             def list\_wines():
-                wines = scrape\_site\_a()  # Start scraping Site A
-                return jsonify(wines), 200
-
-            # Start scraping a specific site
-            @app.route('/scrape/', methods=\['POST'\])
-            def scrape\_site(site\_id):
-                if site\_id == 'site\_a':
-                    data = scrape\_site\_a()  # Scrape Site A
-                    return jsonify(data), 200
-                else:
-                    return jsonify({"error": "Site not found"}), 404
-
-            # Check if the system is working
-            @app.route('/health', methods=\['GET'\])
-            def health():
-                return jsonify({"status": "OK"}), 200
+                wines = scrape\_site\_a()  # Call the scraper to collect data
+                return jsonify(wines), 200  # Return the wine data as a JSON response
 
             if \_\_name\_\_ == '\_\_main\_\_':
-                app.run(debug=True, host='0.0.0.0', port=5000)
+                app.run(debug=True)
         
 
-This is a basic example of how the API works. It listens for requests and responds with the wine data or starts a new scraping task.
+This simple code sets up a route that listens for requests to get wine data. When someone asks for the wine list, the API calls the scraper, collects the data, and sends it back as a response.
 
-5\. Deploying the System with Docker
-------------------------------------
+5\. Docker (Running Everything Smoothly)
+----------------------------------------
 
 ### What is Docker?
 
-Docker is a tool that helps us package the entire system (both the scraper and the API) into a "container". This container can run the system exactly the same way on any computer. This makes it easier to share and deploy the system.
+Docker is a tool that allows you to bundle all the necessary parts of your system into a single container. It’s like packaging everything you need to run the system into one box. This makes sure that the system works the same way on any computer, regardless of what’s already installed on it.
 
 ### Docker Setup
 
-We create a **Dockerfile** that includes instructions to set up the environment for our system and a **docker-compose.yml** file to manage different parts of the system (like the API and scrapers) in one go.
+We create a **Dockerfile** that contains all the steps needed to set up our system, and a **docker-compose.yml** file to manage different parts of the system (like the API and scrapers) together. This makes the deployment process much easier.
 
 ### Example Dockerfile
 
@@ -193,5 +188,7 @@ We create a **Dockerfile** that includes instructions to set up the environment 
             EXPOSE 5000
             CMD \["python", "api/app.py"\]
         
+
+The Dockerfile contains instructions for setting up the environment. It tells Docker to start with a basic Python environment, install all the necessary libraries, and then run the API.
 
 For more information, feel free to ask questions or reach out to the development team!

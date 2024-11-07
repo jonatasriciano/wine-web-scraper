@@ -1,213 +1,231 @@
-  Wine Web Scraping API Documentation
+   Wine Web Scraping API Documentation 
 
 Wine Web Scraping API Documentation
 ===================================
 
-Project Overview
-----------------
+This documentation outlines the architecture and implementation of the web scraping API that collects wine data available in Canada. The system leverages RPA (Robotic Process Automation) to gather wine details from multiple e-commerce sites and presents them through a RESTful API.
 
-This API was developed to automate the collection of wine data from various online retailers across Canada. Each bot (scraper script) is responsible for accessing a specific website and extracting details about available wines, such as name, price, type, vintage, region, and more. This solution is part of an RPA (Robotic Process Automation) project, where each bot functions independently to gather information from different sites.
+* * *
 
-Project Structure
------------------
-
-The project follows a modular design, making it easier to maintain and update individual bots. Here is a suggested structure:
-
-wine\_scraper\_project/
-├── bots/                   # Contains site-specific scraping scripts
-│   ├── site1\_scraper.py
-│   ├── site2\_scraper.py
-│   └── siteN\_scraper.py
-├── core/                   # Base code and common functions
-│   ├── \_\_init\_\_.py
-│   ├── base\_scraper.py     # Base class for scraper bots
-│   └── utils.py            # Utility functions (e.g., HTML parsing, data handling)
-├── api/                    # API code
-│   ├── \_\_init\_\_.py
-│   ├── main.py             # Main API endpoints
-│   └── schemas.py          # Data schemas for API endpoints
-├── data/                   # Database or CSVs where data is stored
-└── docs/                   # Documentation and supporting files
-
-Technologies Used
------------------
-
-*   **Python**: Main programming language.
-*   **FastAPI or Flask**: Framework for building the REST API.
-*   **BeautifulSoup and/or Scrapy**: For parsing and extracting data from websites.
-*   **SQLite or PostgreSQL**: Database to store the scraped data (or CSV, depending on the setup).
-*   **Docker**: Containerizes the application for easy deployment.
-*   **Selenium** (optional): For scraping dynamic (JavaScript) websites.
-
-### Environment Requirements
-
-To run the project locally:
-
-1.  **Python 3.8+**
-2.  **Libraries**:
-    
-        pip install -r requirements.txt
-    
-3.  **Docker** (optional): To isolate the development environment.
-
-Project Dependencies
+1\. Project Overview
 --------------------
 
-Each tool and library was chosen for ease of development and scalability:
+The project aims to automate the collection of wine information available in the Canadian market. The system employs web scraping and RPA to create bots for each e-commerce site. The collected data will be available via a REST API for easy integration with other systems.
 
-    fastapi
-    uvicorn
-    beautifulsoup4
-    requests
-    sqlalchemy
+### 1.1 Main Components
 
-Install these dependencies with:
+*   **Scraping Bots:** Automated scripts responsible for extracting wine data from various websites.
+*   **RESTful API:** Exposes the collected data through a standardized interface.
+*   **Database:** Stores the collected data temporarily (if required), or the data can be fetched in real-time.
+*   **Docker:** Ensures an isolated environment for consistent deployment across different systems.
 
-    pip install -r requirements.txt
+* * *
 
-Base Scraper Class (`base_scraper.py`)
---------------------------------------
+2\. Project Structure
+---------------------
 
-The `BaseScraper` class serves as a foundation for all the bots, defining basic methods like `fetch_page`, which retrieves the HTML page content, and `save_data`, which saves the data to a database or file. Each bot will inherit from this class and implement its own method for extracting site-specific information.
+The project is organized in a modular manner to ensure maintainability and scalability. Each bot will be responsible for scraping a specific site, and configuration files will allow for reuse of code across different sites.
 
-    # core/base_scraper.py
+    ├── bots/                     # Contains scraping scripts
+    │   ├── site\_a\_scraper.py     # Bot for Site A
+    │   ├── site\_b\_scraper.py     # Bot for Site B
+    │   └── config/               # Site configuration files
+    │       ├── site\_a\_config.json
+    │       ├── site\_b\_config.json
+    ├── api/                      # Contains the API that exposes data
+    │   ├── app.py                # Main API code
+    │   ├── requirements.txt      # API dependencies
+    ├── docker-compose.yml        # Docker Compose configuration
+    ├── Dockerfile                # Docker build instructions
+    
+
+### 2.1 Configuration File Example
+
+Each site can have a different layout or data loading method, so we will use configuration files to store site-specific parameters, such as the base URL, CSS selectors, and HTTP headers. These configuration files will be read by the bot to ensure that it functions correctly for each site.
+
+    {
+       "base\_url": "https://www.sitea.com/wines",
+       "selectors": {
+         "name": ".product-title",
+         "price": ".price-tag",
+         "rating": ".rating-score",
+         "region": ".region-name",
+         "type": ".wine-type"
+       },
+       "headers": {
+         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+       }
+    }
+    
+
+* * *
+
+3\. Scraping Bot Development
+----------------------------
+
+Web scraping is the process of extracting data from a web page. In this case, we will scrape wine-related data such as price, rating, and type.
+
+### 3.1 Choosing Libraries
+
+We will use two main libraries for scraping:
+
+*   **BeautifulSoup:** For scraping static websites where content is directly embedded in the HTML.
+*   **Selenium:** For scraping dynamic sites where data is loaded via JavaScript.
+
+### 3.2 Static Scraping with BeautifulSoup
+
+Example bot for Site A using BeautifulSoup:
+
     import requests
     from bs4 import BeautifulSoup
-    from abc import ABC, abstractmethod
-    import sqlite3
-    
-    class BaseScraper(ABC):
-        def __init__(self, url):
-            self.url = url
-            self.session = requests.Session()
-    
-        def fetch_page(self):
-            response = self.session.get(self.url)
-            response.raise_for_status()  # Raises an error if the request fails
-            return response.text
-    
-        @abstractmethod
-        def parse_page(self, html):
-            """Abstract method to be implemented by subclasses to parse the page"""
-            pass
-    
-        def save_data(self, data):
-            """Saves data to a SQLite database"""
-            connection = sqlite3.connect('data/database.db')
-            cursor = connection.cursor()
-    
-            cursor.executemany(
-                'INSERT INTO wines (name, price, region) VALUES (?, ?, ?)',
-                [(item['name'], item['price'], item['region']) for item in data]
-            )
-    
-            connection.commit()
-            connection.close()
-    
+    import json
 
-Individual Site Bots
---------------------
+    # Load configuration
+    with open('config/site\_a\_config.json') as config\_file:
+        config = json.load(config\_file)
 
-Each bot is a class that inherits from `BaseScraper` and implements the `parse_page` method, which varies based on the layout of each site.
-
-    # bots/site1_scraper.py
-    from core.base_scraper import BaseScraper
-    from bs4 import BeautifulSoup
-    
-    class Site1Scraper(BaseScraper):
-        def parse_page(self, html):
-            soup = BeautifulSoup(html, 'html.parser')
-            wines = []
-            
-            # Example data extraction
-            for item in soup.select('.wine-item'):
-                wine = {
-                    'name': item.select_one('.wine-name').get_text(strip=True),
-                    'price': item.select_one('.wine-price').get_text(strip=True),
-                    'region': item.select_one('.wine-region').get_text(strip=True),
-                }
-                wines.append(wine)
-            
-            self.save_data(wines)
-    
-
-API Endpoints
--------------
-
-The API exposes endpoints to initiate scraping and retrieve filtered data.
-
-### API Code (`main.py`)
-
-    # api/main.py
-    from fastapi import FastAPI, HTTPException
-    from bots import site1_scraper, site2_scraper
-    
-    app = FastAPI()
-    
-    @app.post("/scrape/{site_id}")
-    async def scrape(site_id: str):
-        """Starts scraping for the specified site"""
-        if site_id == "site1":
-            scraper = site1_scraper.Site1Scraper("https://example.com/wine")
-            html = scraper.fetch_page()
-            scraper.parse_page(html)
-            return {"message": "Scraping for site1 started successfully."}
-        else:
-            raise HTTPException(status_code=404, detail="Site not found")
-    
-    @app.get("/wines/")
-    async def get_wines(region: str = None, max_price: float = None):
-        """Returns stored wine data with optional filters"""
-        connection = sqlite3.connect('data/database.db')
-        cursor = connection.cursor()
+    def scrape\_site\_a():
+        # Make an HTTP request to the site
+        response = requests.get(config\['base\_url'\], headers=config\['headers'\])
         
-        query = "SELECT name, price, region FROM wines"
-        filters = []
-        params = []
-    
-        if region:
-            filters.append("region = ?")
-            params.append(region)
-        if max_price:
-            filters.append("price <= ?")
-            params.append(max_price)
-    
-        if filters:
-            query += " WHERE " + " AND ".join(filters)
-    
-        cursor.execute(query, params)
-        wines = cursor.fetchall()
-        connection.close()
-    
-        return {"wines": wines}
+        # Check if request was successful
+        if response.status\_code != 200:
+            raise Exception(f"Error accessing site: {response.status\_code}")
+        
+        # Parse the HTML content
+        soup = BeautifulSoup(response.content, 'lxml')
+        
+        # Collect wine data
+        wines = \[\]
+        for wine\_item in soup.select('.product-item'):
+            wine\_data = {
+                "name": wine\_item.select\_one(config\['selectors'\]\['name'\]).text.strip(),
+                "price": wine\_item.select\_one(config\['selectors'\]\['price'\]).text.strip(),
+                "rating": wine\_item.select\_one(config\['selectors'\]\['rating'\]).text.strip(),
+                "region": wine\_item.select\_one(config\['selectors'\]\['region'\]).text.strip(),
+                "type": wine\_item.select\_one(config\['selectors'\]\['type'\]).text.strip(),
+                "url": config\['base\_url'\] + wine\_item.a\['href'\]
+            }
+            wines.append(wine\_data)
+
+        return wines
     
 
-### Example Endpoints
+### 3.3 Dynamic Scraping with Selenium
 
-*   **Start Scraping for a Site**
-    *   **Endpoint**: `/scrape/{site_id}`
-    *   **Method**: `POST`
-    *   **Description**: Starts scraping for the specified site.
-    *   **Parameters**: `site_id` (path): Site identifier.
-    *   **Response**: `200 OK`: Confirms scraping has started.
-*   **Retrieve Stored Data**
-    *   **Endpoint**: `/wines/`
-    *   **Method**: `GET`
-    *   **Description**: Returns all stored wine data, with optional filters for region and price.
+If the site uses JavaScript to load content, Selenium is used to simulate browser behavior and scrape dynamic data.
 
-Example Tests
--------------
+    from selenium import webdriver
+    from selenium.webdriver.common.by import By
+    import time
 
-Use testing to ensure that each bot and API endpoint works as expected:
+    # Configure Selenium to run in headless mode
+    options = webdriver.ChromeOptions()
+    options.add\_argument('--headless')
+    driver = webdriver.Chrome(options=options)
 
-    # tests/test_scrapers.py
-    import unittest
-    from bots.site1_scraper import Site1Scraper
+    # Access the site
+    driver.get('https://www.dynamic-site.com/wines')
+
+    # Wait for page to load
+    time.sleep(5)
+
+    # Collect wine data
+    wines = \[\]
+    wine\_items = driver.find\_elements(By.CLASS\_NAME, 'product-item')
+    for item in wine\_items:
+        name = item.find\_element(By.CLASS\_NAME, 'product-title').text
+        price = item.find\_element(By.CLASS\_NAME, 'price-tag').text
+        wines.append({"name": name, "price": price})
+
+    driver.quit()  # Close the browser after scraping
     
-    class TestSite1Scraper(unittest.TestCase):
-        def test_fetch_page(self):
-            scraper = Site1Scraper("https://example.com/wine")
-            html = scraper.fetch_page()
-            self.assertIn("
 
-`   Docker Setup ------------  For ease of deployment, a Docker setup can be used to package the entire API.      # Dockerfile     FROM python:3.9-slim          WORKDIR /app          COPY requirements.txt .     RUN pip install -r requirements.txt          COPY . .          CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]       Running the Application -----------------------  1.  Install dependencies:              pip install -r requirements.txt      2.  Start the API:              uvicorn api.main:app --reload      3.  To run in Docker:              docker build -t wine_scraper_api .         docker run -p 8000:8000 wine_scraper_api        `
+* * *
+
+4\. Developing the RESTful API
+------------------------------
+
+The API will expose the data collected by the bots through a REST interface. Below are the main endpoints of the API.
+
+### 4.1 API Endpoints
+
+*   **GET /wines:** Returns all collected wine data.
+*   **POST /scrape/{site\_id}:** Triggers scraping for a specific site.
+*   **GET /health:** Checks the health of the API.
+
+### 4.2 API Code Example
+
+    from flask import Flask, jsonify
+    from bots.site\_a\_scraper import scrape\_site\_a
+
+    app = Flask(\_\_name\_\_)
+
+    # Endpoint to list all wines
+    @app.route('/wines', methods=\['GET'\])
+    def list\_wines():
+        wines = scrape\_site\_a()  # Start scraping for Site A
+        return jsonify(wines), 200
+
+    # Endpoint to start scraping manually
+    @app.route('/scrape/', methods=\['POST'\])
+    def scrape\_site(site\_id):
+        if site\_id == 'site\_a':
+            data = scrape\_site\_a()  # Start scraping for Site A
+            return jsonify(data), 200
+        else:
+            return jsonify({"error": "Site not found"}), 404
+
+    # Health check endpoint
+    @app.route('/health', methods=\['GET'\])
+    def health():
+        return jsonify({"status": "OK"}), 200
+
+    if \_\_name\_\_ == '\_\_main\_\_':
+        app.run(debug=True, host='0.0.0.0', port=5000)
+    
+
+* * *
+
+5\. Docker Deployment
+---------------------
+
+To ensure the API runs in an isolated environment that is easy to deploy across different systems, we will use Docker.
+
+### 5.1 Dockerfile
+
+    FROM python:3.9-slim
+
+    WORKDIR /app
+    COPY requirements.txt .
+    RUN pip install -r requirements.txt
+
+    COPY . .
+
+    EXPOSE 5000
+    CMD \["python", "api/app.py"\]
+    
+
+### 5.2 Docker Compose
+
+    version: '3.8'
+
+    services:
+      api:
+        build: .
+        ports:
+          - "5000:5000"
+        volumes:
+          - .:/app
+        environment:
+          - FLASK\_ENV=development
+    
+
+* * *
+
+6\. Future Improvements and Considerations
+------------------------------------------
+
+*   **Error Handling:** Implement error handling and logging to ensure that bots don't fail silently.
+*   **Scalability:** Consider using **Celery** for asynchronous processing and scheduling scraping, allowing for greater scale.
+*   **Monitoring:** Create an interface to monitor the status of each bot, how much data has been collected, and if any errors have occurred.
